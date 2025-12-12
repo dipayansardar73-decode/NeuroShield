@@ -74,7 +74,7 @@ class EnsembleAnomalyDetector:
         self.feature_names = feature_names
         X_scaled = self.scaler.fit_transform(X)
         self.models['isolation_forest'] = IsolationForest(contamination=self.contamination, random_state=42, n_jobs=-1).fit(X_scaled)
-        self.models['lof'] = LocalOutlierFactor(n_neighbors=20, contamination=self.contamination).fit(X_scaled)
+        self.models['lof'] = LocalOutlierFactor(novelty=True, n_neighbors=20, contamination=self.contamination).fit(X_scaled)
         y_synthetic = np.zeros(len(X))
         y_synthetic[self.models['isolation_forest'].predict(X_scaled) == -1] = 1
         self.models['random_forest'] = RandomForestClassifier(n_estimators=100, random_state=42).fit(X_scaled, y_synthetic)
@@ -84,10 +84,10 @@ class EnsembleAnomalyDetector:
         X_scaled = self.scaler.transform(X)
         if_pred = self.models['isolation_forest'].predict(X_scaled)
         if_score = -self.models['isolation_forest'].score_samples(X_scaled)
-        lof_pred = self.models['lof'].predict(X_scaled)
-        lof_score = -self.models['lof'].negative_outlier_factor_
-        lof_score = (lof_score - lof_score.min()) / (lof_score.max() - lof_score.min() + 1e-6)
-        rf_score = self.models['random_forest'].predict_proba(X_scaled)[:, 1]
+                lof_pred = self.models['lof'].predict(X_scaled)
+                lof_score = -self.models['lof'].decision_function(X_scaled)
+                rf_score = self.models['random_forest'].predict_proba(X_scaled)[:, 1]
+                lof_score = (lof_score - lof_score.min()) / (lof_score.max() - lof_score.min() + 1e-6)
         if_score_norm = MinMaxScaler().fit_transform(if_score.reshape(-1, 1)).flatten()
         ensemble_score = (0.4 * if_score_norm + 0.3 * lof_score + 0.3 * rf_score)
         return {'ensemble_score': ensemble_score, 'is_anomaly': (ensemble_score > 0.5).astype(int)}
